@@ -10,6 +10,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
@@ -60,9 +61,12 @@ public class GraphActivity extends AppCompatActivity {
         Button saveChartButton = findViewById(R.id.saveChartButton);
 
         ArrayList<String> dataList = getIntent().getStringArrayListExtra("data");
+        Log.d("GraphActivity", "Received data size: " + (dataList != null ? dataList.size() : "null"));
         if (dataList != null && !dataList.isEmpty()) {
+            Log.d("GraphActivity", "First data item: " + dataList.get(0));
             setupChart(dataList);
         } else {
+            Log.d("GraphActivity", "No data available for graph");
             Toast.makeText(this, "No data available for graph", Toast.LENGTH_SHORT).show();
         }
 
@@ -124,7 +128,6 @@ public class GraphActivity extends AppCompatActivity {
         }
     }
 
-
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
@@ -136,35 +139,46 @@ public class GraphActivity extends AppCompatActivity {
             }
         }
     }
-
     private void setupChart(ArrayList<String> dataList) {
-        List<Entry> batteryLevelEntries = new ArrayList<>();
-        List<Entry> batteryTempEntries = new ArrayList<>();
-        List<Entry> voltageEntries = new ArrayList<>();
-        List<String> xAxisLabels = new ArrayList<>();
+    List<Entry> batteryLevelEntries = new ArrayList<>();
+    List<Entry> batteryTempEntries = new ArrayList<>();
+    List<Entry> voltageEntries = new ArrayList<>();
+    List<String> xAxisLabels = new ArrayList<>();
 
-        SimpleDateFormat inputFormat = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss", Locale.getDefault());
-        SimpleDateFormat outputFormat = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
+    SimpleDateFormat inputFormat = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss", Locale.getDefault());
+    SimpleDateFormat outputFormat = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
 
-        for (int i = 0; i < dataList.size(); i++) {
-            String[] parts = dataList.get(i).split(" \\| ");
-            if (parts.length >= 6) {
-                try {
-                    Date date = inputFormat.parse(parts[0]);
-                    String time = outputFormat.format(date);
+    for (int i = 0; i < dataList.size(); i++) {
+        String[] parts = dataList.get(i).split(" \\| ");
+        if (parts.length >= 7) {
+            try {
+                // Combine date and time parts
+                String dateTimeString = parts[1] + " " + parts[2];
+                Date date = inputFormat.parse(dateTimeString);
+                String time = outputFormat.format(date);
 
-                    float batteryLevel = Float.parseFloat(parts[5].replace("%", ""));
-                    float batteryTemp = Float.parseFloat(parts[2].replace("°C", ""));
-                    float voltage = Float.parseFloat(parts[3].replace("V", ""));
+                float batteryTemp = Float.parseFloat(parts[3].replace("°C", ""));
+                float voltage = Float.parseFloat(parts[4].replace("V", ""));
+                float batteryLevel = Float.parseFloat(parts[6].replace("%", ""));
 
-                    batteryLevelEntries.add(new Entry(i, batteryLevel));
-                    batteryTempEntries.add(new Entry(i, batteryTemp));
-                    voltageEntries.add(new Entry(i, voltage));
-                    xAxisLabels.add(time);
-                } catch (ParseException | NumberFormatException e) {
-                    e.printStackTrace();
-                }
+                Log.d("GraphActivity", "Parsed data: Time=" + time + ", Level=" + batteryLevel + ", Temp=" + batteryTemp + ", Voltage=" + voltage);
+
+                batteryLevelEntries.add(new Entry(i, batteryLevel));
+                batteryTempEntries.add(new Entry(i, batteryTemp));
+                voltageEntries.add(new Entry(i, voltage));
+                xAxisLabels.add(time);
+            } catch (ParseException | NumberFormatException e) {
+                Log.e("GraphActivity", "Error parsing data: " + dataList.get(i), e);
             }
+        } else {
+            Log.w("GraphActivity", "Invalid data format: " + dataList.get(i));
+        }
+    }
+
+        if (batteryLevelEntries.isEmpty() || batteryTempEntries.isEmpty() || voltageEntries.isEmpty()) {
+            Log.w("GraphActivity", "No valid data points to display");
+            Toast.makeText(this, "No valid data points to display", Toast.LENGTH_SHORT).show();
+            return;
         }
 
         // Battery Level Line
@@ -242,8 +256,11 @@ public class GraphActivity extends AppCompatActivity {
         rightAxis.setAxisMaximum(maxVoltage + 0.5f);
         rightAxis.setDrawGridLines(false);
 
-        chart.setVisibleXRangeMinimum(5); // Show at least 5 X values
+        chart.setVisibleXRangeMaximum(10); // Show 10 values at a time
+        chart.moveViewToX(0); // Start from the beginning
 
         chart.invalidate();
+
+        Log.d("GraphActivity", "Chart setup complete. Data points: " + lineData.getEntryCount());
     }
 }

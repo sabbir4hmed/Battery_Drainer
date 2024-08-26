@@ -32,6 +32,7 @@ import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.ListView;
+import android.widget.ProgressBar;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -65,6 +66,7 @@ public class MainActivity extends AppCompatActivity {
 
     private SeekBar targetBatteryLevelSlider;
     private TextView batteryHealthText, batteryTempText, batteryVoltageText, batteryTechText, batteryLevelText;
+    private ProgressBar batterybar;
     private TextView targetLevelValue;
     private CheckBox cpuLoadCheck, flashlightCheck, brightnessCheck, gpsCheck, vibratorCheck, networkCheck, bluetoothCheck;
     private Button startButton, stopButton;
@@ -83,6 +85,11 @@ public class MainActivity extends AppCompatActivity {
     private ConnectivityManager.NetworkCallback networkCallback;
     private boolean isNetworkCallbackRegistered = false;
     private List<Float> batteryUsageData;
+    private Vibrator vibrator;
+    private boolean isVibrating = false;
+    private Thread vibrationThread;
+    private boolean isFlashlightOn = false;
+
 
 
 
@@ -95,12 +102,14 @@ public class MainActivity extends AppCompatActivity {
         setupTargetSlider();
         setupCheckBoxes();
         setupButtons();
-        setupListView();
+
 
         IntentFilter filter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
         registerReceiver(batteryInfoReceiver, filter);
 
         batteryUsageData = new ArrayList<>();
+
+        lastRecordedBatteryLevel = getCurrentBatteryLevel();
 
         networkCallback = new ConnectivityManager.NetworkCallback() {
             @Override
@@ -115,8 +124,6 @@ public class MainActivity extends AppCompatActivity {
         };
 
         dataList = new ArrayList<>();
-        adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, dataList);
-        dataListView.setAdapter(adapter);
 
         lastRecordedBatteryLevel = getCurrentBatteryLevel();
 
@@ -125,18 +132,21 @@ public class MainActivity extends AppCompatActivity {
             public void run() {
                 if (running) {
                     int currentBatteryLevel = getCurrentBatteryLevel();
-                    if (currentBatteryLevel < lastRecordedBatteryLevel) {
-                        updateBatteryInfo();
-                        lastRecordedBatteryLevel = currentBatteryLevel;
-                    }
+                    updateBatteryInfo();
+
                     if (currentBatteryLevel <= targetBatteryLevel) {
-                        stopBatteryDrain();
+                        running = false;
+                        handler.post(() -> {
+                            stopBatteryDrain();
+                            Toast.makeText(MainActivity.this, "Battery drain test finished", Toast.LENGTH_LONG).show();
+                        });
                     } else {
-                        handler.postDelayed(this, 1000);
+                        handler.postDelayed(this, 1000); // Update every second
                     }
                 }
             }
         };
+
     }
 
     private void initializeViews() {
@@ -147,6 +157,7 @@ public class MainActivity extends AppCompatActivity {
         batteryTechText = findViewById(R.id.batteryTechText);
         batteryLevelText = findViewById(R.id.batteryLevelText);
         targetLevelValue = findViewById(R.id.targetLevelValue);
+        batterybar = findViewById(R.id.batteryLevelProgress);
 
         cpuLoadCheck = findViewById(R.id.cpuLoadCheck);
         flashlightCheck = findViewById(R.id.flashlightCheck);
@@ -158,7 +169,7 @@ public class MainActivity extends AppCompatActivity {
 
         startButton = findViewById(R.id.startButton);
         stopButton = findViewById(R.id.stopButton);
-        dataListView = findViewById(R.id.dataListView);
+
     }
 
     private void setupTargetSlider() {
@@ -238,11 +249,12 @@ public class MainActivity extends AppCompatActivity {
         dataList = new ArrayList<>();
         adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, dataList);
         dataListView.setAdapter(adapter);
+        dataListView.setTranscriptMode(ListView.TRANSCRIPT_MODE_ALWAYS_SCROLL);
+        dataListView.setStackFromBottom(true);
     }
 
     private void startBatteryDrain() {
         dataList.clear();
-        adapter.notifyDataSetChanged();
         lastRecordedBatteryLevel = getCurrentBatteryLevel();
 
         acquireWakeLock();
@@ -252,32 +264,111 @@ public class MainActivity extends AppCompatActivity {
         if (brightnessCheck.isChecked()) activateHighBrightness();
         if (gpsCheck.isChecked()) activateGPS();
         if (vibratorCheck.isChecked()) activateVibrator();
-        if (networkCheck.isChecked())
-        {
+        if (networkCheck.isChecked()) {
             activateNetworkConnection();
-            Toast.makeText(MainActivity.this, "Connecting to WiFi...", Toast.LENGTH_SHORT).show();
-        }
-        else
-        {
-
+            Toast.makeText(MainActivity.this, "Please turn on wifi", Toast.LENGTH_SHORT).show();
         }
         if (bluetoothCheck.isChecked()) requestBluetoothPermissionAndEnable();
 
         running = true;
-        handler.postDelayed(batteryMonitoringRunnable, 1000);
+        startButton.setEnabled(false);
+        stopButton.setEnabled(true);
+        handler.post(batteryMonitoringRunnable);
     }
+
+
 
     private void stopBatteryDrain() {
         running = false;
-        releaseWakeLock();
-        stopScheduledTasks();
+        handler.removeCallbacks(batteryMonitoringRunnable);
 
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Generate Graph")
-                .setMessage("Do you want to generate a graph of the battery drain?")
-                .setPositiveButton("Yes", (dialog, which) -> generateGraph())
-                .setNegativeButton("No", null)
-                .show();
+        releaseWakeLock();
+        startButton.setEnabled(true);
+        stopScheduledTasks();
+        stopVibration();
+        deactivateFlashlight();
+        deactivatehighbrightness();
+        deactivateGPS();
+        deactivateNetworkConnection();
+        deactivateBluetooth();
+
+        // Uncheck all checkboxes
+        runOnUiThread(() -> {
+            cpuLoadCheck.setChecked(false);
+            flashlightCheck.setChecked(false);
+            networkCheck.setChecked(false);
+            bluetoothCheck.setChecked(false);
+            gpsCheck.setChecked(false);
+            vibratorCheck.setChecked(false);
+            brightnessCheck.setChecked(false);
+        });
+
+        if (!dataList.isEmpty()) {
+            runOnUiThread(() -> {
+                AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
+                builder.setTitle("Generate Graph")
+                        .setMessage("Do you want to generate a graph of the battery drain?")
+                        .setPositiveButton("Yes", (dialog, which) -> {
+                            Intent intent = new Intent(MainActivity.this, GraphActivity.class);
+                            intent.putStringArrayListExtra("data", new ArrayList<>(dataList));
+                            startActivity(intent);
+                        })
+                        .setNegativeButton("No", null)
+                        .show();
+            });
+
+            saveBatteryUsageData();
+        } else {
+            runOnUiThread(() -> Toast.makeText(MainActivity.this, "No data available for graph", Toast.LENGTH_SHORT).show());
+        }
+    }
+
+    private void deactivateBluetooth() {
+        BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+        if (bluetoothAdapter != null && bluetoothAdapter.isEnabled()) {
+            bluetoothAdapter.disable();
+        }
+    }
+
+    private void deactivateNetworkConnection() {
+        if (isNetworkCallbackRegistered && connectivityManager != null) {
+            connectivityManager.unregisterNetworkCallback(networkCallback);
+            isNetworkCallbackRegistered = false;
+        }
+    }
+
+    private void deactivateGPS() {
+        LocationManager locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        if (locationManager != null && locationListener != null) {
+            locationManager.removeUpdates(locationListener);
+        }
+    }
+
+
+    private void stopflashlight() {
+
+    }
+
+
+    private void deactivatehighbrightness() {
+        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        WindowManager.LayoutParams layoutParams = getWindow().getAttributes();
+        layoutParams.screenBrightness = -1.0f; // Default brightness
+        getWindow().setAttributes(layoutParams);
+    }
+
+    private void stopVibration() {
+        isVibrating = false;
+        if (vibrator != null) {
+            vibrator.cancel();
+        }
+        if (vibrationThread != null) {
+            try {
+                vibrationThread.join();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     private void deactivatenetworkConnection() {
@@ -314,7 +405,9 @@ public class MainActivity extends AppCompatActivity {
         CameraManager cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
         if (cameraManager != null) {
             try {
-                cameraManager.setTorchMode(cameraManager.getCameraIdList()[0], true);
+                String cameraId = cameraManager.getCameraIdList()[0];
+                cameraManager.setTorchMode(cameraId, true);
+                isFlashlightOn = true;
             } catch (CameraAccessException e) {
                 e.printStackTrace();
             }
@@ -322,6 +415,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void activateHighBrightness() {
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         WindowManager.LayoutParams layoutParams = getWindow().getAttributes();
         layoutParams.screenBrightness = 1.0f; // Max brightness
         getWindow().setAttributes(layoutParams);
@@ -354,13 +448,27 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void activateVibrator() {
-        Vibrator vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-        if (vibrator != null) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                vibrator.vibrate(VibrationEffect.createOneShot(1000, VibrationEffect.DEFAULT_AMPLITUDE));
-            } else {
-                vibrator.vibrate(1000);
-            }
+        vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+        if (vibrator != null && vibrator.hasVibrator()) {
+            isVibrating = true;
+            vibrationThread = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    while (isVibrating) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            vibrator.vibrate(VibrationEffect.createOneShot(1000, VibrationEffect.DEFAULT_AMPLITUDE));
+                        } else {
+                            vibrator.vibrate(1000);
+                        }
+                        try {
+                            Thread.sleep(1100); // Wait a bit more than the vibration duration to avoid overlap
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+            });
+            vibrationThread.start();
         }
     }
 
@@ -397,16 +505,22 @@ public class MainActivity extends AppCompatActivity {
         public void run() {
             if (running) {
                 int currentBatteryLevel = getCurrentBatteryLevel();
-                batteryUsageData.add((float) currentBatteryLevel);
                 updateBatteryInfo();
+
+                Log.d("BatteryDrain", "Current: " + currentBatteryLevel + ", Target: " + targetBatteryLevel);
+
                 if (currentBatteryLevel <= targetBatteryLevel) {
-                    stopBatteryDrain();
+                    handler.post(() -> {
+                        stopBatteryDrain();
+                        Toast.makeText(MainActivity.this, "Battery drain test finished", Toast.LENGTH_LONG).show();
+                    });
                 } else {
-                    handler.postDelayed(this, 1000);
+                    handler.postDelayed(this, 1000); // Update every second
                 }
             }
         }
     };
+
 
     private void updateBatteryInfo() {
         Intent batteryIntent = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
@@ -416,29 +530,57 @@ public class MainActivity extends AppCompatActivity {
             int health = batteryIntent.getIntExtra(BatteryManager.EXTRA_HEALTH, -1);
             int temperature = batteryIntent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, -1);
             int voltage = batteryIntent.getIntExtra(BatteryManager.EXTRA_VOLTAGE, -1);
-            String technology = batteryIntent.getStringExtra(BatteryManager.EXTRA_TECHNOLOGY);
+            int status = batteryIntent.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
 
             int batteryLevel = (int) ((level / (float) scale) * 100);
-            String healthString = getHealthString(health);
-            float temperatureCelsius = temperature / 10.0f;
-            float voltageVolts = voltage / 1000.0f;
+            Log.d("BatteryDrain", "Battery Level: " + batteryLevel + "%");
+            if (batteryLevel != lastRecordedBatteryLevel) {
+                String modelName = Build.MODEL;
+                SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy", Locale.getDefault());
+                SimpleDateFormat timeFormat = new SimpleDateFormat("hh:mm:ss", Locale.getDefault());
+                String currentDate = dateFormat.format(new Date());
+                String currentTime = timeFormat.format(new Date());
+                float temperatureCelsius = temperature / 10.0f;
+                float voltageVolts = voltage / 1000.0f;
+                String chargingState = getChargingState(status);
 
-            SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss", Locale.getDefault());
-            String currentTime = sdf.format(new Date());
+                String dataEntry = String.format(Locale.getDefault(),
+                        "%s | %s | %s | %.1f°C | %.3fV | %s | %d%%",
+                        modelName, currentDate, currentTime, temperatureCelsius, voltageVolts, chargingState, batteryLevel);
 
-            String dataEntry = String.format(Locale.getDefault(),
-                    "%s | %s | %.1f°C | %.3fV | %s | %d%%",
-                    currentTime, healthString, temperatureCelsius, voltageVolts, technology, batteryLevel);
+                dataList.add(dataEntry);
+                lastRecordedBatteryLevel = batteryLevel;
 
-            dataList.add(dataEntry);
-            adapter.notifyDataSetChanged();
+                Log.d("BatteryDrain", "Added entry: " + dataEntry);
+                Log.d("BatteryDrain", "DataList size: " + dataList.size());
+            }
 
             // Update TextViews
-            batteryHealthText.setText("Health: " + healthString);
-            batteryTempText.setText("Temperature: " + temperatureCelsius + "°C");
-            batteryVoltageText.setText("Voltage: " + voltageVolts + "V");
-            batteryTechText.setText("Technology: " + technology);
-            batteryLevelText.setText("Level: " + batteryLevel + "%");
+            runOnUiThread(() -> {
+                batteryLevelText.setText("Battery Level: " + batteryLevel + "%");
+                batteryTechText.setText("Technology: " + batteryIntent.getStringExtra(BatteryManager.EXTRA_TECHNOLOGY));
+                batteryHealthText.setText("Health: " + getHealthString(health));
+                batteryTempText.setText("Temperature: " + (temperature / 10.0f) + "°C");
+                batteryVoltageText.setText("Voltage: " + (voltage / 1000.0f) + "V");
+                batterybar.setProgress(batteryLevel);
+            });
+        }
+    }
+
+    private String getChargingState(int status) {
+        switch (status) {
+            case BatteryManager.BATTERY_STATUS_CHARGING:
+                return "Charging";
+            case BatteryManager.BATTERY_STATUS_DISCHARGING:
+                return "Discharging";
+            case BatteryManager.BATTERY_STATUS_FULL:
+                return "Full";
+            case BatteryManager.BATTERY_STATUS_NOT_CHARGING:
+                return "Not Charging";
+            case BatteryManager.BATTERY_STATUS_UNKNOWN:
+                return "Unknown";
+            default:
+                return "Unknown";
         }
     }
 
@@ -460,25 +602,36 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void generateGraph() {
-        Intent intent = new Intent(this, GraphActivity.class);
-        intent.putStringArrayListExtra("data", new ArrayList<>(dataList));
-        startActivity(intent);
+        if (!dataList.isEmpty()) {
+            Intent intent = new Intent(this, GraphActivity.class);
+            intent.putStringArrayListExtra("data", new ArrayList<>(dataList));
+            startActivity(intent);
+        } else {
+            Toast.makeText(this, "No data available for graph", Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void saveBatteryUsageData() {
-        File file = new File(getFilesDir(), "battery_usage_data_" + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date()) + ".csv");
+        File documentsPath = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), "BatteryDrainer");
+        if (!documentsPath.exists()) {
+            documentsPath.mkdirs();
+        }
+
+        File file = new File(documentsPath, "battery_usage_data_" + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date()) + ".csv");
 
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
-            writer.write("Timestamp,Battery Level\n");
-            for (int i = 0; i < batteryUsageData.size(); i++) {
-                writer.write(System.currentTimeMillis() + "," + batteryUsageData.get(i) + "\n");
+            writer.write("Model,Date,Time,Temperature,Voltage,ChargingState,BatteryLevel\n");
+            for (String entry : dataList) {
+                String[] parts = entry.split(" \\| ");
+                writer.write(String.join(",", parts) + "\n");
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
 
         Toast.makeText(this, "Battery usage data saved to " + file.getAbsolutePath(), Toast.LENGTH_LONG).show();
-    }
+
+}
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -501,6 +654,22 @@ public class MainActivity extends AppCompatActivity {
         if (isNetworkCallbackRegistered && connectivityManager != null) {
             connectivityManager.unregisterNetworkCallback(networkCallback);
         }
+        deactivateFlashlight();
+    }
+
+    private void deactivateFlashlight() {
+        if (isFlashlightOn) {
+            CameraManager cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
+            if (cameraManager != null) {
+                try {
+                    String cameraId = cameraManager.getCameraIdList()[0];
+                    cameraManager.setTorchMode(cameraId, false);
+                    isFlashlightOn = false;
+                } catch (CameraAccessException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
     }
 
     private int getCurrentBatteryLevel() {
@@ -519,4 +688,17 @@ public class MainActivity extends AppCompatActivity {
             updateBatteryInfo();
         }
     };
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        IntentFilter filter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+        registerReceiver(batteryInfoReceiver, filter);
+        updateBatteryInfo();
+    }
+    @Override
+    protected void onPause() {
+        super.onPause();
+        unregisterReceiver(batteryInfoReceiver);
+    }
 }
