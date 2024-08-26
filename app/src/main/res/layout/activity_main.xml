@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:scrollbars="none">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:padding="16dp">
+
+        <TextView
+            android:id="@+id/targetLevelLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Target Battery Level"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <SeekBar
+            android:id="@+id/targetBatteryLevelSlider"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="15dp"
+            android:max="100"
+            android:progress="50"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/targetLevelLabel" />
+
+        <TextView
+            android:id="@+id/targetLevelValue"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="50%"
+            android:textSize="16sp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/targetBatteryLevelSlider" />
+
+        <TextView
+            android:id="@+id/batteryHealthText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="35dp"
+            android:textSize="18dp"
+            android:text="Battery Health: "
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/targetBatteryLevelSlider" />
+
+        <TextView
+            android:id="@+id/batteryTempText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="18dp"
+            android:text="Battery Temperature: "
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/batteryHealthText" />
+
+        <TextView
+            android:id="@+id/batteryVoltageText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Battery Voltage: "
+            android:textSize="18dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/batteryTempText" />
+
+        <TextView
+            android:id="@+id/batteryTechText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Battery Technology: "
+            android:textSize="18dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/batteryVoltageText" />
+
+        <TextView
+            android:id="@+id/batteryLevelText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Battery Level: "
+            android:textSize="18dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/batteryTechText" />
+
+        <TextView
+            android:id="@+id/drainOptionsLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="Battery Drain Options"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/batteryLevelText" />
+
+        <CheckBox
+            android:id="@+id/cpuLoadCheck"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="High CPU Load"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/drainOptionsLabel" />
+
+        <CheckBox
+            android:id="@+id/flashlightCheck"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Flash Light On"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/cpuLoadCheck" />
+
+        <CheckBox
+            android:id="@+id/brightnessCheck"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="High Brightness Display"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/flashlightCheck" />
+
+        <CheckBox
+            android:id="@+id/gpsCheck"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Location On"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/brightnessCheck" />
+
+        <CheckBox
+            android:id="@+id/vibratorCheck"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Vibrator On"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/gpsCheck" />
+
+        <CheckBox
+            android:id="@+id/networkCheck"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Wi-Fi On"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/vibratorCheck" />
+
+
+        <CheckBox
+            android:id="@+id/bluetoothCheck"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Bluetooth On"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/networkCheck" />
+
+        <Button
+            android:id="@+id/startButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:layout_marginEnd="8dp"
+            android:text="Start"
+            app:layout_constraintEnd_toStartOf="@id/stopButton"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/bluetoothCheck" />
+
+        <Button
+            android:id="@+id/stopButton"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_marginTop="24dp"
+            android:text="Stop"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@id/startButton"
+            app:layout_constraintTop_toBottomOf="@id/bluetoothCheck" />
+
+        <TextView
+            android:id="@+id/dataHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Model Name | Date | Time | Temp | Voltage | Charging State | Battery Level"
+            android:textSize="12dp"
+            android:textStyle="bold"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/startButton" />
+
+        <ListView
+            android:id="@+id/dataListView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_marginTop="8dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/dataHeader" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</ScrollView>
