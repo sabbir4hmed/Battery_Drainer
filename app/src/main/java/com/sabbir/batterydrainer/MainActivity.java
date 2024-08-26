@@ -272,7 +272,7 @@ public class MainActivity extends AppCompatActivity {
 
         running = true;
         startButton.setEnabled(false);
-        stopButton.setEnabled(true);
+        stopButton.setEnabled(false);
         handler.post(batteryMonitoringRunnable);
     }
 

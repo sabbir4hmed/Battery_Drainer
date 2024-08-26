@@ -4,6 +4,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:theme="@style/Theme.AppCompat.DayNight.NoActionBar"
     android:scrollbars="none">
 
     <androidx.constraintlayout.widget.ConstraintLayout
@@ -16,7 +17,9 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Target Battery Level"
-            android:textSize="18sp"
+            android:textSize="25sp"
+            android:textColor="#4CAF50"
+            android:layout_marginTop="20dp"
             android:textStyle="bold"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
@@ -26,22 +29,30 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="15dp"
+            android:minHeight="15dp"
+            android:maxWidth="15dp"
             android:max="100"
             android:progress="50"
+            android:thumb="@drawable/seekbar_thumb"
+            android:progressTint="@color/blue"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/targetLevelLabel" />
+             app:layout_constraintTop_toBottomOf="@id/targetLevelLabel" />
 
         <ProgressBar
             android:id="@+id/batteryLevelProgress"
             style="?android:attr/progressBarStyleHorizontal"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="15dp"
             app:layout_constraintTop_toBottomOf="@id/batteryLevelText"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
-            android:max="100" />
+            android:max="100"
+            android:progressDrawable="@drawable/progress_bar"
+            android:minHeight="15dp"
+            android:maxHeight="15dp"
+        />
 
         <TextView
             android:id="@+id/targetLevelValue"
@@ -106,16 +117,20 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
             android:text="Battery Drain Options"
-            android:textSize="18sp"
+            android:textColor="#4CAF50"
+            android:textSize="25sp"
             android:textStyle="bold"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/batteryLevelText" />
+            app:layout_constraintTop_toBottomOf="@id/batteryLevelProgress" />
 
         <CheckBox
             android:id="@+id/cpuLoadCheck"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="High CPU Load"
+            android:layout_marginTop="20dp"
+            android:textSize="18dp"
+            android:buttonTint="@color/blue"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/drainOptionsLabel" />
 
@@ -124,6 +139,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Flash Light On"
+            android:buttonTint="@color/blue"
+            android:textSize="18dp"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/cpuLoadCheck" />
 
@@ -132,6 +149,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="High Brightness Display"
+            android:buttonTint="@color/blue"
+            android:textSize="18dp"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/flashlightCheck" />
 
@@ -140,6 +159,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Location On"
+            android:textSize="18dp"
+            android:buttonTint="@color/blue"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/brightnessCheck" />
 
@@ -148,6 +169,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Vibrator On"
+            android:textSize="18dp"
+            android:buttonTint="@color/blue"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/gpsCheck" />
 
@@ -156,6 +179,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Wi-Fi On"
+            android:textSize="18dp"
+            android:buttonTint="@color/blue"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/vibratorCheck" />
 
@@ -165,6 +190,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Bluetooth On"
+            android:textSize="18dp"
+            android:buttonTint="@color/blue"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/networkCheck" />
 
@@ -174,6 +201,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
             android:layout_marginEnd="8dp"
+            android:background="#4CAF50"
             android:text="Start"
             app:layout_constraintEnd_toStartOf="@id/stopButton"
             app:layout_constraintStart_toStartOf="parent"
@@ -185,10 +213,33 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
             android:layout_marginTop="24dp"
+            android:background="#F44336"
             android:text="Stop"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toEndOf="@id/startButton"
             app:layout_constraintTop_toBottomOf="@id/bluetoothCheck" />
+
+        <TextView
+            android:id="@+id/statusText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Developed By: SABBIR AHMED"
+            android:textSize="13dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/stopButton" />
+        <TextView
+            android:id="@+id/status1Text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
+            android:text="version 1.5.0"
+            android:textSize="13dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/statusText" />
+
 
 
 
