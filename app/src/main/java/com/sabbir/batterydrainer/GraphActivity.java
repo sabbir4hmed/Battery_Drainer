@@ -9,6 +9,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
 import android.provider.MediaStore;
 import android.util.Log;
 import android.view.View;
@@ -58,7 +59,7 @@ public class GraphActivity extends AppCompatActivity {
         setContentView(R.layout.activity_graph);
 
         chart = findViewById(R.id.chart);
-        Button saveChartButton = findViewById(R.id.saveChartButton);
+
 
         ArrayList<String> dataList = getIntent().getStringArrayListExtra("data");
         Log.d("GraphActivity", "Received data size: " + (dataList != null ? dataList.size() : "null"));
@@ -70,75 +71,66 @@ public class GraphActivity extends AppCompatActivity {
             Toast.makeText(this, "No data available for graph", Toast.LENGTH_SHORT).show();
         }
 
-        saveChartButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    saveChartToGallery();
-                } else {
-                    if (ContextCompat.checkSelfPermission(GraphActivity.this, android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                            != PackageManager.PERMISSION_GRANTED) {
-                        ActivityCompat.requestPermissions(GraphActivity.this,
-                                new String[]{android.Manifest.permission.WRITE_EXTERNAL_STORAGE},
-                                PERMISSION_REQUEST_WRITE_EXTERNAL_STORAGE);
-                    } else {
-                        saveChartToGalleryLegacy();
+        if (getIntent().getBooleanExtra("saveAsPng", false)) {
+            new Handler().postDelayed(this::saveChartAsPng, 1000);  // Delay to ensure chart is rendered
+        }
+
+
+    }
+
+    private void saveChartAsPng() {
+        Bitmap chartBitmap = chart.getChartBitmap();
+        String fileName = "BatteryDrainGraph_" + System.currentTimeMillis() + ".png";
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ContentValues contentValues = new ContentValues();
+            contentValues.put(MediaStore.MediaColumns.DISPLAY_NAME, fileName);
+            contentValues.put(MediaStore.MediaColumns.MIME_TYPE, "image/png");
+            contentValues.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES);
+
+            ContentResolver resolver = getContentResolver();
+            Uri imageUri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues);
+
+            try {
+                if (imageUri != null) {
+                    try (OutputStream out = resolver.openOutputStream(imageUri)) {
+                        chartBitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
                     }
+                    Toast.makeText(this, "Graph saved to gallery", Toast.LENGTH_SHORT).show();
                 }
+            } catch (IOException e) {
+                e.printStackTrace();
+                Toast.makeText(this, "Failed to save graph", Toast.LENGTH_SHORT).show();
             }
-        });
-    }
-
-    private void saveChartToGalleryLegacy() {
-        Bitmap chartBitmap = chart.getChartBitmap();
-        String fileName = "BatteryChart_" + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date()) + ".png";
-        File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), fileName);
-
-        try (FileOutputStream out = new FileOutputStream(file)) {
-            chartBitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
-            Toast.makeText(this, "Chart saved to gallery: " + file.getAbsolutePath(), Toast.LENGTH_LONG).show();
-        } catch (IOException e) {
-            e.printStackTrace();
-            Toast.makeText(this, "Failed to save chart", Toast.LENGTH_SHORT).show();
-        }
-    }
-
-    private void saveChartToGallery() {
-        Bitmap chartBitmap = chart.getChartBitmap();
-        String fileName = "BatteryChart_" + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date()) + ".png";
-
-        ContentValues contentValues = new ContentValues();
-        contentValues.put(MediaStore.MediaColumns.DISPLAY_NAME, fileName);
-        contentValues.put(MediaStore.MediaColumns.MIME_TYPE, "image/png");
-        contentValues.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES);
-
-        ContentResolver resolver = getContentResolver();
-        Uri imageUri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues);
-
-        try {
-            if (imageUri != null) {
-                try (OutputStream out = resolver.openOutputStream(imageUri)) {
-                    chartBitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
-                }
-                Toast.makeText(this, "Chart saved to gallery", Toast.LENGTH_LONG).show();
+        } else {
+            File path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
+            File file = new File(path, fileName);
+            try (FileOutputStream out = new FileOutputStream(file)) {
+                chartBitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
+                Toast.makeText(this, "Graph saved to gallery", Toast.LENGTH_SHORT).show();
+            } catch (IOException e) {
+                e.printStackTrace();
+                Toast.makeText(this, "Failed to save graph", Toast.LENGTH_SHORT).show();
             }
-        } catch (IOException e) {
-            e.printStackTrace();
-            Toast.makeText(this, "Failed to save chart", Toast.LENGTH_SHORT).show();
         }
+
     }
+
+
+
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == PERMISSION_REQUEST_WRITE_EXTERNAL_STORAGE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                saveChartToGalleryLegacy();
+                saveChartAsPng();
             } else {
                 Toast.makeText(this, "Permission denied. Cannot save chart.", Toast.LENGTH_SHORT).show();
             }
         }
     }
+
     private void setupChart(ArrayList<String> dataList) {
     List<Entry> batteryLevelEntries = new ArrayList<>();
     List<Entry> batteryTempEntries = new ArrayList<>();

@@ -107,6 +107,8 @@ public class MainActivity extends AppCompatActivity {
         IntentFilter filter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
         registerReceiver(batteryInfoReceiver, filter);
 
+
+
         batteryUsageData = new ArrayList<>();
 
         lastRecordedBatteryLevel = getCurrentBatteryLevel();
@@ -133,6 +135,7 @@ public class MainActivity extends AppCompatActivity {
                 if (running) {
                     int currentBatteryLevel = getCurrentBatteryLevel();
                     updateBatteryInfo();
+                    Log.d("BatteryDrain", "Current: " + currentBatteryLevel + ", Target: " + targetBatteryLevel);
 
                     if (currentBatteryLevel <= targetBatteryLevel) {
                         running = false;
@@ -147,6 +150,15 @@ public class MainActivity extends AppCompatActivity {
             }
         };
 
+    }
+
+    private String getAppVersion() {
+        try {
+            return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+        } catch (PackageManager.NameNotFoundException e) {
+            e.printStackTrace();
+            return "Unknown";
+        }
     }
 
     private void initializeViews() {
@@ -166,6 +178,9 @@ public class MainActivity extends AppCompatActivity {
         vibratorCheck = findViewById(R.id.vibratorCheck);
         networkCheck = findViewById(R.id.networkCheck);
         bluetoothCheck = findViewById(R.id.bluetoothCheck);
+        TextView versionTextView = findViewById(R.id.status1Text);
+        String versionText = "version " + getAppVersion();
+        versionTextView.setText(versionText);
 
         startButton = findViewById(R.id.startButton);
         stopButton = findViewById(R.id.stopButton);
@@ -190,7 +205,23 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setupCheckBoxes() {
-        CompoundButton.OnCheckedChangeListener listener = (buttonView, isChecked) -> checkStartButtonState();
+        CompoundButton.OnCheckedChangeListener listener = (buttonView, isChecked) -> {
+            checkStartButtonState();
+            if (isChecked) {
+                int id = buttonView.getId();
+                if (id == R.id.gpsCheck) {
+                    Toast.makeText(MainActivity.this, "Please turn on Location", Toast.LENGTH_SHORT).show();
+                } else if (id == R.id.networkCheck) {
+                    Toast.makeText(MainActivity.this, "Please turn on WiFi", Toast.LENGTH_SHORT).show();
+                } else if (id == R.id.bluetoothCheck) {
+                    if (ContextCompat.checkSelfPermission(MainActivity.this, android.Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
+                        Toast.makeText(MainActivity.this, "Please turn on Bluetooth", Toast.LENGTH_SHORT).show();
+                    } else {
+                        ActivityCompat.requestPermissions(MainActivity.this, new String[]{android.Manifest.permission.BLUETOOTH_CONNECT}, BLUETOOTH_PERMISSION_REQUEST);
+                    }
+                }
+            }
+        };
 
         cpuLoadCheck.setOnCheckedChangeListener(listener);
         flashlightCheck.setOnCheckedChangeListener(listener);
@@ -198,32 +229,11 @@ public class MainActivity extends AppCompatActivity {
         gpsCheck.setOnCheckedChangeListener(listener);
         vibratorCheck.setOnCheckedChangeListener(listener);
         networkCheck.setOnCheckedChangeListener(listener);
-        bluetoothCheck.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            checkStartButtonState();
-            toggleBluetooth(isChecked);
-        });
+        bluetoothCheck.setOnCheckedChangeListener(listener);
 
         checkStartButtonState();
     }
 
-    private void toggleBluetooth(boolean enable) {
-        BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
-        if (bluetoothAdapter != null) {
-            if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
-                if (enable && !bluetoothAdapter.isEnabled()) {
-                    bluetoothAdapter.enable();
-                    Snackbar.make(findViewById(android.R.id.content), "Bluetooth Enabled", Snackbar.LENGTH_SHORT).show();
-                } else if (!enable && bluetoothAdapter.isEnabled()) {
-                    bluetoothAdapter.disable();
-                    Snackbar.make(findViewById(android.R.id.content), "Bluetooth Disabled", Snackbar.LENGTH_SHORT).show();
-                }
-            } else {
-                ActivityCompat.requestPermissions(this, new String[]{android.Manifest.permission.BLUETOOTH_CONNECT}, BLUETOOTH_PERMISSION_REQUEST);
-            }
-        } else {
-            Snackbar.make(findViewById(android.R.id.content), "Bluetooth is not supported on this device", Snackbar.LENGTH_SHORT).show();
-        }
-    }
 
     private void checkStartButtonState() {
         boolean anyChecked = cpuLoadCheck.isChecked() ||
@@ -262,23 +272,30 @@ public class MainActivity extends AppCompatActivity {
         if (cpuLoadCheck.isChecked()) activateHighCPULoad();
         if (flashlightCheck.isChecked()) activateFlashlight();
         if (brightnessCheck.isChecked()) activateHighBrightness();
-        if (gpsCheck.isChecked()) activateGPS();
+        if (gpsCheck.isChecked()) {
+            Toast.makeText(MainActivity.this, "Please turn on Location", Toast.LENGTH_SHORT).show();
+        }
         if (vibratorCheck.isChecked()) activateVibrator();
         if (networkCheck.isChecked()) {
-            activateNetworkConnection();
             Toast.makeText(MainActivity.this, "Please turn on wifi", Toast.LENGTH_SHORT).show();
         }
-        if (bluetoothCheck.isChecked()) requestBluetoothPermissionAndEnable();
+        if (bluetoothCheck.isChecked()) {
+            Toast.makeText(MainActivity.this, "Please turn on Bluetooth", Toast.LENGTH_SHORT).show();
+        }
 
         running = true;
         startButton.setEnabled(false);
-        stopButton.setEnabled(false);
+        stopButton.setEnabled(true);
         handler.post(batteryMonitoringRunnable);
     }
 
 
 
     private void stopBatteryDrain() {
+
+        if (!running) {
+            return;  // If already stopped, don't do anything
+        }
         running = false;
         handler.removeCallbacks(batteryMonitoringRunnable);
 
@@ -304,19 +321,10 @@ public class MainActivity extends AppCompatActivity {
         });
 
         if (!dataList.isEmpty()) {
-            runOnUiThread(() -> {
-                AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
-                builder.setTitle("Generate Graph")
-                        .setMessage("Do you want to generate a graph of the battery drain?")
-                        .setPositiveButton("Yes", (dialog, which) -> {
-                            Intent intent = new Intent(MainActivity.this, GraphActivity.class);
-                            intent.putStringArrayListExtra("data", new ArrayList<>(dataList));
-                            startActivity(intent);
-                        })
-                        .setNegativeButton("No", null)
-                        .show();
-            });
+            // Generate and save graph
+            generateGraph();
 
+            // Save CSV file
             saveBatteryUsageData();
         } else {
             runOnUiThread(() -> Toast.makeText(MainActivity.this, "No data available for graph", Toast.LENGTH_SHORT).show());
@@ -421,31 +429,6 @@ public class MainActivity extends AppCompatActivity {
         getWindow().setAttributes(layoutParams);
     }
 
-    private void activateGPS() {
-        LocationManager locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-        if (locationManager != null) {
-            locationListener = new LocationListener() {
-                @Override
-                public void onLocationChanged(@NonNull Location location) {
-                    // Do nothing
-                }
-
-                @Override
-                public void onStatusChanged(String provider, int status, Bundle extras) {}
-
-                @Override
-                public void onProviderEnabled(@NonNull String provider) {}
-
-                @Override
-                public void onProviderDisabled(@NonNull String provider) {}
-            };
-            if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, locationListener);
-            } else {
-                ActivityCompat.requestPermissions(this, new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION}, 1);
-            }
-        }
-    }
 
     private void activateVibrator() {
         vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
@@ -472,24 +455,8 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void activateNetworkConnection() {
-        connectivityManager = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
-        if (connectivityManager != null) {
-            NetworkRequest.Builder builder = new NetworkRequest.Builder();
-            builder.addTransportType(NetworkCapabilities.TRANSPORT_WIFI);
 
-            connectivityManager.registerNetworkCallback(builder.build(), networkCallback);
-            isNetworkCallbackRegistered = true;
-        }
-    }
 
-    private void requestBluetoothPermissionAndEnable() {
-        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_ADMIN) == PackageManager.PERMISSION_GRANTED) {
-            toggleBluetooth(true);
-        } else {
-            ActivityCompat.requestPermissions(this, new String[]{android.Manifest.permission.BLUETOOTH_ADMIN}, BLUETOOTH_PERMISSION_REQUEST);
-        }
-    }
 
     private void stopScheduledTasks() {
         if (cpuLoadExecutor != null && !cpuLoadExecutor.isShutdown()) {
@@ -603,8 +570,9 @@ public class MainActivity extends AppCompatActivity {
 
     private void generateGraph() {
         if (!dataList.isEmpty()) {
-            Intent intent = new Intent(this, GraphActivity.class);
+            Intent intent = new Intent(MainActivity.this, GraphActivity.class);
             intent.putStringArrayListExtra("data", new ArrayList<>(dataList));
+            intent.putExtra("saveAsPng", true);  // Add this flag to indicate automatic saving
             startActivity(intent);
         } else {
             Toast.makeText(this, "No data available for graph", Toast.LENGTH_SHORT).show();
@@ -633,17 +601,7 @@ public class MainActivity extends AppCompatActivity {
 
 }
 
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == BLUETOOTH_PERMISSION_REQUEST) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                toggleBluetooth(bluetoothCheck.isChecked());
-            } else {
-                Toast.makeText(this, "Bluetooth permission denied", Toast.LENGTH_SHORT).show();
-            }
-        }
-    }
+
 
     @Override
     protected void onDestroy() {
